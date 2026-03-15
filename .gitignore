@@ -1,0 +1,9 @@
+node_modules/
+dist/
+out/
+sample/
+src/__tests__/
+*.log
+.DS_Store
+.env
+*.tgz
