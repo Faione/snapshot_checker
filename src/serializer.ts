@@ -40,9 +40,9 @@ function serializeOneSample(sample: RecordSample): string {
 
   if (sample.callchainFrames) {
     lines.push(`  `);
-    lines.push(`  callchain: ${sample.callchainFrames.count}`);
+    lines.push(` callchain: ${sample.callchainFrames.count}`);
     for (const frame of sample.callchainFrames.frames) {
-      lines.push(`    ${frame}`);
+      lines.push(`  ${frame}`);
     }
   }
 
