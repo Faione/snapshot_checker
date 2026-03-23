@@ -1,10 +1,6 @@
 import type {
   RecordSample,
   RecordSampleHeader,
-  CallchainEntry,
-  RawEntry,
-  ServerEntry,
-  CallchainFramesEntry,
   PerfData,
 } from "./types.js";
 
