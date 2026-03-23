@@ -17,7 +17,7 @@
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
-    "test": "npm run build && node --test dist/__tests__/parser.test.js"
+    "test": "npm run build && node --test tests/filterByTgid.test.mjs"
   },
   "keywords": ["perf", "parser", "library"],
   "author": "",

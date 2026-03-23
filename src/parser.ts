@@ -204,3 +204,12 @@ export function parsePerfData(text: string): PerfData {
   }
   return { recordSamples };
 }
+
+/**
+ * 按 tgid 过滤 RecordSample（当前以 pid 字段作为 tgid）
+ */
+export function filterByTgid(data: PerfData, tgid: number): PerfData {
+  return {
+    recordSamples: data.recordSamples.filter((sample) => sample.pid === tgid),
+  };
+}

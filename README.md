@@ -25,12 +25,14 @@ import {
   parsePerfData,
   formatPerfDataToText,
   formatPerfDataToJson,
+  filterByTgid,
 } from "hiperf_txt_parser";
 ```
 
 - `parsePerfData(text: string): PerfData`
 - `formatPerfDataToText(data: PerfData): string`
 - `formatPerfDataToJson(data: PerfData): Array<{ issuce: "unknow"; call_chain: string }>`
+- `filterByTgid(data: PerfData, tgid: number): PerfData`（仅保留 `pid === tgid` 的 RecordSample）
 
 ## 快速示例
 
@@ -40,7 +42,8 @@ import { parsePerfData, formatPerfDataToJson, formatPerfDataToText } from "hiper
 const input = `record sample: type 9, misc 2, size 520\n  sample_type: 0x8000107e7\n  ID 13`;
 
 const parsed = parsePerfData(input);
-const jsonArray = formatPerfDataToJson(parsed);
+const filtered = filterByTgid(parsed, 1234);
+const jsonArray = formatPerfDataToJson(filtered);
 const txt = formatPerfDataToText(parsed);
 ```
 
