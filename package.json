@@ -1,19 +1,25 @@
 {
-  "name": "snapshot-checker",
+  "name": "hiperf_txt_parser",
   "version": "1.0.0",
   "description": "Parse perf data.txt and output structured TypeScript data",
   "type": "module",
   "main": "dist/index.js",
-  "bin": {
-    "perf_parser": "dist/cli.js"
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
-    "start": "node dist/cli.js",
-    "parse": "node dist/cli.js",
+    "prepublishOnly": "npm run build",
     "test": "npm run build && node --test dist/__tests__/parser.test.js"
   },
-  "keywords": ["perf", "parser", "cli"],
+  "keywords": ["perf", "parser", "library"],
   "author": "",
   "license": "MIT",
   "devDependencies": {

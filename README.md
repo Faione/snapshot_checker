@@ -1,79 +1,74 @@
-# snapshot-checker
+# hiperf_txt_parser
 
-解析 `perf data.txt` 文本，仅提取 **record sample** 块并输出为 TypeScript 结构数据（JSON）。忽略 `record comm` 等其他前缀。
+将 perf 文本中的 `record sample` 段解析为结构化数据，并支持导出为：
+- perf 原文本格式（保留缩进和行前缀）
+- JSON 数组格式（每项为 `{ "issuce": "unknow", "call_chain": "..." }`）
 
-**命令行工具名称：`perf_parser`**
+> 本项目当前为 **纯 lib 库**，`src` 仅保留库代码，不包含 CLI。
 
 ## 安装
 
 ```bash
+npm install hiperf_txt_parser
+```
+
+本地调试可直接安装本地路径：
+
+```bash
+npm install /Users/fanghaolei/Workplace/TS/snapshot_checker
+```
+
+## 对外 API
+
+```ts
+import {
+  parsePerfData,
+  formatPerfDataToText,
+  formatPerfDataToJson,
+} from "hiperf_txt_parser";
+```
+
+- `parsePerfData(text: string): PerfData`
+- `formatPerfDataToText(data: PerfData): string`
+- `formatPerfDataToJson(data: PerfData): Array<{ issuce: "unknow"; call_chain: string }>`
+
+## 快速示例
+
+```ts
+import { parsePerfData, formatPerfDataToJson, formatPerfDataToText } from "hiperf_txt_parser";
+
+const input = `record sample: type 9, misc 2, size 520\n  sample_type: 0x8000107e7\n  ID 13`;
+
+const parsed = parsePerfData(input);
+const jsonArray = formatPerfDataToJson(parsed);
+const txt = formatPerfDataToText(parsed);
+```
+
+## Consumer Demo（外部 TS 项目）
+
+提供了两个 demo：
+
+- `demo/external-ts-consumer`：最小调用示例
+- `demo/lib-consumer`：读取 `sample/perf_data.txt`，导出 json/txt 到 `out/lib-consumer/`
+
+运行文件 I/O demo：
+
+```bash
+cd demo/lib-consumer
 npm install
-npm run build
+npm run demo
 ```
 
-全局使用可执行：`npm link`，之后在任意目录运行 `perf_parser`。
+## 输出结构说明
 
-### 本地调试（不使用 npm link）
+- 解析结构（`parsePerfData`）：`{ recordSamples: RecordSample[] }`
+- JSON 导出（`formatPerfDataToJson`）：
 
-在项目根目录先执行一次 `npm run build`，然后任选一种方式运行：
-
-```bash
-# 方式一：用 node 直接跑编译产物（推荐）
-node dist/cli.js --input_file sample/perf_data.txt
-
-# 方式二：用 npm run parse，注意参数要放在 -- 后面
-npm run parse -- --input_file sample/perf_data.txt
-npm run parse -- --input_file sample/perf_data.txt --output_file out/perf_data.txt
-
-# 方式三：用 npx 运行当前项目的 bin（在项目根目录下执行）
-npx . --input_file sample/perf_data.txt
+```json
+[
+  {
+    "issuce": "unknow",
+    "call_chain": "frame1\\nframe2\\nframe3"
+  }
+]
 ```
-
-路径均为相对于当前工作目录；在项目根目录执行即可用 `sample/perf_data.txt`。
-
-## 用法
-
-```bash
-perf_parser --input_file <path> [--output_file <path>]
-```
-
-### Flags 说明
-
-| Flag | 说明 |
-|------|------|
-| `--input_file <path>` | **必填**。输入的 perf data 文本文件路径（如 `perf_data.txt`） |
-| `--output_file <path>` | **可选**。将解析结果导出为该路径的文本文件（与 `sample/perf_data.txt` 同格式，含缩进与行前缀）；若目录不存在会先创建；不指定则把 JSON 打印到 stdout |
-| `--help`, `-h` | 显示帮助 |
-
-以上 flag 支持 `--flag value` 或 `--flag=value` 两种写法。
-
-### 示例
-
-```bash
-# 解析并打印到终端
-perf_parser --input_file sample/perf_data.txt
-
-# 解析并导出为与 sample 同格式的文本文件（路径不存在时会先创建）
-perf_parser --input_file sample/perf_data.txt --output_file out/perf_data.txt
-
-# 查看帮助
-perf_parser --help
-```
-
-## 输出结构
-
-- `recordSamples`: 数组，每个元素为一个 record sample
-  - `header`: `{ type, misc, size }`
-  - `sample_type`, `id`, `ip`, `pid`, `tid`, `time`, `stream_id`, `cpu`, `res`, `period`
-  - `callchain?`: `{ nr, addresses[] }`
-  - `raw?`: `{ size, lines: [{ hex, short? }] }`
-  - `server?`: `{ nr, pids[] }`
-  - `callchainFrames?`: `{ count, frames[] }`
-
-## 测试
-
-```bash
-npm test
-```
-
-测试用例基于 `sample/perf_data.txt` 的格式，覆盖两个 record sample、record comm 过滤、空输入等。

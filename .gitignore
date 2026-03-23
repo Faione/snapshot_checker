@@ -3,6 +3,8 @@ dist/
 out/
 sample/
 src/__tests__/
+demo/**/node_modules/
+demo/**/dist/
 *.log
 .DS_Store
 .env

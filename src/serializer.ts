@@ -55,3 +55,20 @@ function serializeOneSample(sample: RecordSample): string {
 export function formatPerfDataToText(data: PerfData): string {
   return data.recordSamples.map(serializeOneSample).join("\n\n");
 }
+
+/** 导出用 JSON 的单项：issuce 固定为 "unknow"，call_chain 为 frames 逐行拼接 */
+export interface RecordSampleJsonExportItem {
+  issuce: "unknow";
+  call_chain: string;
+}
+
+/**
+ * 将 PerfData 转为导出用 JSON 结构：顶层为数组，每项为 { issuce: "unknow", call_chain: "" }，
+ * call_chain 由对应 record sample 的 callchainFrames.frames 逐行拼接得到，无则为空字符串。
+ */
+export function formatPerfDataToJson(data: PerfData): RecordSampleJsonExportItem[] {
+  return data.recordSamples.map((s) => ({
+    issuce: "unknow" as const,
+    call_chain: s.callchainFrames ? s.callchainFrames.frames.join("\n") : "",
+  }));
+}
