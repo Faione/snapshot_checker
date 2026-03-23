@@ -1,6 +1,6 @@
 {
   "name": "hiperf_txt_parser",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Parse perf data.txt and output structured TypeScript data",
   "type": "module",
   "main": "dist/index.js",
@@ -19,7 +19,11 @@
     "prepublishOnly": "npm run build",
     "test": "npm run build && node --test tests/filterByTgid.test.mjs"
   },
-  "keywords": ["perf", "parser", "library"],
+  "keywords": [
+    "perf",
+    "parser",
+    "library"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
