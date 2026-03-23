@@ -1,0 +1,18 @@
+{
+  "name": "hiperf_txt_parser-lib-consumer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "demo": "npm run build && npm run start"
+  },
+  "dependencies": {
+    "hiperf_txt_parser": "file:../.."
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  }
+}
