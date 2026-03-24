@@ -34,11 +34,26 @@ export function toBackTraceStack(sample: RecordSample): string {
  * 批量将 PerfData 中所有 RecordSample 转为 hstack 可解析栈。
  * 返回数组长度与 recordSamples 一致，元素顺序一一对应。
  */
-export function toBackTraceStacks(data: PerfData): string[] {
-  const stacks = data.recordSamples.map((sample) => toBackTraceStack(sample));
-  const nonEmpty = stacks.filter((s) => s.length > 0).length;
+export function toBackTraceStacks(data: PerfData): PerfData {
+  const recordSamples = data.recordSamples.map((sample) => {
+    const backtrace = toBackTraceStack(sample);
+    if (!sample.callchainFrames) {
+      return sample;
+    }
+    const frameLines = backtrace ? backtrace.split("\n") : [];
+    return {
+      ...sample,
+      callchainFrames: {
+        ...sample.callchainFrames,
+        frames: frameLines,
+      },
+    };
+  });
+  const nonEmpty = recordSamples.filter(
+    (sample) => (sample.callchainFrames?.frames.length ?? 0) > 0,
+  ).length;
   console.info(
     `[hiperf_txt_parser] toBackTraceStacks processed recordSamples: ${data.recordSamples.length}, non-empty user stacks: ${nonEmpty}`,
   );
-  return stacks;
+  return { recordSamples };
 }

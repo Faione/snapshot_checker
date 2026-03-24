@@ -98,10 +98,10 @@ test("toBackTraceStacks should export backtrace stack in batch", () => {
   };
 
   const out = toBackTraceStacks({ recordSamples: [sample1, sample2] });
-  assert.equal(out.length, 2);
+  assert.equal(out.recordSamples.length, 2);
   assert.equal(
-    out[0],
-    "#26 at triggerBinder (entry|entry|1.0.0|src/main/ets/myabilitystage/PreloadHook.ts:4:21)",
+    out.recordSamples[0].callchainFrames.frames[0],
+    "#26 at triggerBinder (entry|entry|1.0.0|src/main/ets/myabilitystage/PreloadHook.ts:4:21)"
   );
-  assert.equal(out[1], "");
+  assert.deepEqual(out.recordSamples[1].callchainFrames.frames, []);
 });
