@@ -23,6 +23,10 @@ export function toBackTraceStack(sample: RecordSample): string {
     out.push(`#${index} at ${funcName} (${urlInfo})`);
   }
 
+  console.info(
+    `[hiperf_txt_parser] toBackTraceStack user stacks: ${out.length}/${frames.length}`,
+  );
+
   return out.join("\n");
 }
 
@@ -31,5 +35,10 @@ export function toBackTraceStack(sample: RecordSample): string {
  * 返回数组长度与 recordSamples 一致，元素顺序一一对应。
  */
 export function toBackTraceStacks(data: PerfData): string[] {
-  return data.recordSamples.map((sample) => toBackTraceStack(sample));
+  const stacks = data.recordSamples.map((sample) => toBackTraceStack(sample));
+  const nonEmpty = stacks.filter((s) => s.length > 0).length;
+  console.info(
+    `[hiperf_txt_parser] toBackTraceStacks processed recordSamples: ${data.recordSamples.length}, non-empty user stacks: ${nonEmpty}`,
+  );
+  return stacks;
 }

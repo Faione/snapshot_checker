@@ -278,6 +278,9 @@ export function parsePerfData(text: string): PerfData {
       // 跳过无法解析的块
     }
   }
+  console.info(
+    `[hiperf_txt_parser] parsePerfData parsed recordSamples: ${recordSamples.length}`,
+  );
   return { recordSamples };
 }
 
@@ -285,7 +288,11 @@ export function parsePerfData(text: string): PerfData {
  * 按 tgid 过滤 RecordSample（当前以 pid 字段作为 tgid）
  */
 export function filterByTgid(data: PerfData, tgid: number): PerfData {
-  return {
-    recordSamples: data.recordSamples.filter((sample) => sample.pid === tgid),
-  };
+  const before = data.recordSamples.length;
+  const afterSamples = data.recordSamples.filter((sample) => sample.pid === tgid);
+  const after = afterSamples.length;
+  console.info(
+    `[hiperf_txt_parser] filterByTgid tgid=${tgid}, recordSamples: ${before} -> ${after}`,
+  );
+  return { recordSamples: afterSamples };
 }
