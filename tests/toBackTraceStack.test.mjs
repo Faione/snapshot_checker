@@ -103,5 +103,5 @@ test("toBackTraceStacks should export backtrace stack in batch", () => {
     out.recordSamples[0].callchainFrames.frames[0],
     "#26 at triggerBinder (entry|entry|1.0.0|src/main/ets/myabilitystage/PreloadHook.ts:4:21)"
   );
-  assert.deepEqual(out.recordSamples[1].callchainFrames.frames, []);
+  assert.equal(out.recordSamples[1].callchainFrames, undefined);
 });

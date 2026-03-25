@@ -35,12 +35,16 @@ export function toBackTraceStack(sample: RecordSample): string {
  * 返回数组长度与 recordSamples 一致，元素顺序一一对应。
  */
 export function toBackTraceStacks(data: PerfData): PerfData {
-  const recordSamples = data.recordSamples.map((sample) => {
+  const recordSamples = data.recordSamples.map<RecordSample>((sample) => {
     const backtrace = toBackTraceStack(sample);
     if (!sample.callchainFrames) {
       return sample;
     }
     const frameLines = backtrace ? backtrace.split("\n") : [];
+    if (frameLines.length === 0) {
+      const { callchainFrames, ...rest } = sample;
+      return rest;
+    }
     return {
       ...sample,
       callchainFrames: {

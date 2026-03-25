@@ -33,6 +33,9 @@ import {
 - `formatPerfDataToText(data: PerfData): string`
 - `formatPerfDataToJson(data: PerfData): Array<{ issuce: "unknow"; call_chain: string }>`
 - `filterByTgid(data: PerfData, tgid: number): PerfData`（仅保留 `pid === tgid` 的 RecordSample）
+- `parseTraceFormat(text: string): ParsedTraceFormat`（解析 `sample/trace_format` 风格文本）
+- `parseCommonFieldsFromRaw(raw: Uint8Array, format: ParsedTraceFormat): Record<string, number | bigint>`（按 format 仅解析 `common_*` 字段，小端）
+- `rawHexLinesToBuffer(lines): Uint8Array`（将 perf 文本里 raw 段的 hex 行拼成字节缓冲，便于喂给 `parseCommonFieldsFromRaw`）
 
 ## 快速示例
 
