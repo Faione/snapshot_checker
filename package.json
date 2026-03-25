@@ -1,6 +1,6 @@
 {
   "name": "hiperf_txt_parser",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Parse perf data.txt and output structured TypeScript data",
   "type": "module",
   "main": "dist/index.js",
