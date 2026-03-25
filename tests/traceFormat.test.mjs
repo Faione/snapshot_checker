@@ -151,3 +151,37 @@ test("decodePerfRawData should replace sample.raw with common_type when parser m
   assert.equal(out.recordSamples[0].raw.lines.length, 1);
   assert.equal(out.recordSamples[0].raw.lines[0].hex, "99");
 });
+
+test("__data_loc char[] should be decoded and usable in print fmt", () => {
+  const format = `name: foo
+ID: 77
+format:
+  field:unsigned short common_type;  offset:0; size:2; signed:0;
+  field:unsigned char common_flags;  offset:2; size:1; signed:0;
+  field:unsigned char common_preempt_count; offset:3; size:1; signed:0;
+  field:int common_pid; offset:4; size:4; signed:1;
+  field:__data_loc char[] reason; offset:8; size:4; signed:0;
+
+print fmt: "reason=%s off=%u len=%u", REC->reason, (REC->__data_loc_reason & 0xffff), (REC->__data_loc_reason >> 16)
+`;
+  const registry = buildTraceParserRegistry([format]);
+
+  // layout: common(8) + loc(4) + padding(4) + string at offset 16
+  const offset = 16;
+  const str = new TextEncoder().encode("hello\0");
+  const len = str.length;
+  const loc = (len << 16) | offset;
+  const rawBytes = new Uint8Array(16 + len);
+  rawBytes[0] = 77; rawBytes[1] = 0; // common_type
+  // loc u32 LE at offset8
+  rawBytes[8] = loc & 0xff;
+  rawBytes[9] = (loc >> 8) & 0xff;
+  rawBytes[10] = (loc >> 16) & 0xff;
+  rawBytes[11] = (loc >> 24) & 0xff;
+  rawBytes.set(str, offset);
+
+  const out = decodeRawByRegistry(rawBytes, registry);
+  assert.equal(out.skipped, false);
+  assert.equal(out.commonType, 77);
+  assert.equal(out.renderedText, `reason=hello off=${offset} len=${len}`);
+});

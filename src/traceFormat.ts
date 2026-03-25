@@ -218,12 +218,42 @@ export function parseCommonFieldsFromRaw(
 export function parseAllFieldsFromRaw(
   raw: Uint8Array,
   format: ParsedTraceFormat,
-): Record<string, number | bigint | Array<number | bigint>> {
+): Record<string, number | bigint | string | Array<number | bigint>> {
   const view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
-  const out: Record<string, number | bigint | Array<number | bigint>> = {};
+  const out: Record<string, number | bigint | string | Array<number | bigint>> = {};
+  const decoder = new TextDecoder("utf-8", { fatal: false });
   for (const field of format.fields) {
     const arr = parseArrayName(field.name);
     const key = arr ? arr.baseName : field.name;
+
+    const t = normalizeType(field.typeName);
+    // __data_loc char[] reason: 实际存一个 u32，低 16 位为 offset，高 16 位为 length
+    if (t.includes("__data_loc") && t.includes("char")) {
+      const locField: TraceFormatField = {
+        ...field,
+        typeName: "unsigned int",
+        signed: false,
+        size: 4,
+      };
+      const loc = readFieldScalar(view, locField);
+      if (typeof loc === "number") {
+        const locKey = `__data_loc_${field.name}`;
+        out[locKey] = loc;
+        const offset = loc & 0xffff;
+        const len = (loc >>> 16) & 0xffff;
+        if (offset >= 0 && len > 0 && offset + len <= raw.length) {
+          const bytes = raw.slice(offset, offset + len);
+          // 去掉末尾 \0
+          const nul = bytes.indexOf(0);
+          const slice = nul >= 0 ? bytes.slice(0, nul) : bytes;
+          out[field.name] = decoder.decode(slice);
+        } else {
+          out[field.name] = "";
+        }
+      }
+      continue;
+    }
+
     const v = readFieldValue(view, field);
     if (v !== undefined) {
       out[key] = v;
@@ -272,52 +302,74 @@ export function buildTraceParserRegistry(formatTexts: string[]): TraceParserRegi
   return { byEventId, commonFormat };
 }
 
-function formatArgBySpecifier(value: number | bigint, spec: string): string {
+function formatArgBySpecifier(value: number | bigint | string, spec: string): string {
+  if (spec.toLowerCase() === "s") {
+    return typeof value === "string" ? value : String(value);
+  }
   const isBig = typeof value === "bigint";
   const lower = spec.toLowerCase();
   if (lower === "x") {
-    return isBig ? value.toString(16) : Math.trunc(value).toString(16);
+    return isBig ? value.toString(16) : Math.trunc(value as number).toString(16);
   }
   if (lower === "u") {
-    if (isBig) return (value < 0n ? 0n : value).toString(10);
-    return Math.max(0, Math.trunc(value)).toString(10);
+    if (isBig) return ((value as bigint) < 0n ? 0n : (value as bigint)).toString(10);
+    return Math.max(0, Math.trunc(value as number)).toString(10);
   }
-  return isBig ? value.toString(10) : Math.trunc(value).toString(10);
+  return isBig ? (value as bigint).toString(10) : Math.trunc(value as number).toString(10);
 }
 
 function renderPrintFmt(
   printFmt: string,
   printArgs: string[] | undefined,
-  fieldMap: Record<string, number | bigint | Array<number | bigint>>,
+  fieldMap: Record<string, number | bigint | string | Array<number | bigint>>,
 ): string {
-  const values: Array<number | bigint> = [];
-  for (const expr of printArgs ?? []) {
-    const em = expr.match(/^REC->(\w+)(?:\[(\d+)])?$/);
-    if (!em) {
-      values.push(0);
-      continue;
+  const values: Array<number | bigint | string> = [];
+
+  function evalExpr(exprRaw: string): number | bigint | string {
+    // 允许表达式带括号与空格
+    let expr = exprRaw.trim();
+    // 去掉外层括号（可能不止一层，也可能只有一侧被 match 捕获到）
+    while (expr.startsWith("(")) expr = expr.slice(1).trim();
+    while (expr.endsWith(")")) expr = expr.slice(0, -1).trim();
+    expr = expr.replace(/\s+/g, "");
+
+    // (REC->__data_loc_reason&0xffff) / (REC->__data_loc_reason>>16)
+    let m = expr.match(/^REC->(\w+)&0xffff$/);
+    if (m) {
+      const v = fieldMap[m[1]];
+      const n = typeof v === "number" ? v : 0;
+      return n & 0xffff;
     }
-    const name = em[1];
-    const idxRaw = em[2];
+    m = expr.match(/^REC->(\w+)>>16$/);
+    if (m) {
+      const v = fieldMap[m[1]];
+      const n = typeof v === "number" ? v : 0;
+      return (n >>> 16) & 0xffff;
+    }
+
+    // REC->field 或 REC->field[idx]
+    m = expr.match(/^REC->(\w+)(?:\[(\d+)])?$/);
+    if (!m) return 0;
+    const name = m[1];
+    const idxRaw = m[2];
     const v = fieldMap[name];
     if (idxRaw !== undefined) {
       const idx = parseInt(idxRaw, 10);
       if (Array.isArray(v) && idx >= 0 && idx < v.length) {
-        values.push(v[idx]);
-      } else {
-        values.push(0);
+        return v[idx];
       }
-    } else if (Array.isArray(v)) {
-      values.push(v[0] ?? 0);
-    } else if (v !== undefined) {
-      values.push(v);
-    } else {
-      values.push(0);
+      return 0;
     }
+    if (Array.isArray(v)) return v[0] ?? 0;
+    return v ?? 0;
+  }
+
+  for (const expr of printArgs ?? []) {
+    values.push(evalExpr(expr));
   }
 
   let valueIdx = 0;
-  return printFmt.replace(/%[0-9]*[lh]*([duxX])/g, (_all, spec: string) => {
+  return printFmt.replace(/%[0-9]*[lh]*([duxXsS])/g, (_all, spec: string) => {
     const v = values[valueIdx++] ?? 0;
     return formatArgBySpecifier(v, spec);
   });
