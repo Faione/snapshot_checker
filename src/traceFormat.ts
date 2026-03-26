@@ -35,6 +35,13 @@ export interface DecodedRawSample {
   skipped: boolean;
 }
 
+export interface DecodePerfRawDataOptions {
+  /** 是否在替换后的 raw 内容中保留 common_* 信息 */
+  keepCommonFields?: boolean;
+}
+
+export type Endian = "le" | "be";
+
 const FIELD_LINE_RE =
   /^\s*field:([^;]+);\s*offset:(\d+);\s*size:(\d+);\s*signed:([01]);/;
 
@@ -263,25 +270,62 @@ export function parseAllFieldsFromRaw(
 }
 
 /**
- * 将 perf 文本里 raw 段的 hex 行拼成连续字节（小端：每行一个数值，宽度由 hex 位数决定，4→2 字节，8→4 字节，16→8 字节）
+ * 将 perf 文本里 raw 段的 hex 行拼成连续字节（小端）。
+ *
+ * 规则：每行视为一个整数 token（如 0x12345678），按该 token 的字节宽度转成 LE 字节序。
+ * 例如：0x12345678 => [0x78, 0x56, 0x34, 0x12]
  */
 export function rawHexLinesToBuffer(
   lines: Array<{ hex: string }>,
+  endian: Endian = "le",
 ): Uint8Array {
   const chunks: number[] = [];
   for (const { hex } of lines) {
-    const s = hex.replace(/^0x/i, "").trim();
+    let s = hex.replace(/^0x/i, "").trim();
     if (!s) continue;
-    const byteLen = Math.ceil(s.length / 2);
-    const width = byteLen <= 2 ? 2 : byteLen <= 4 ? 4 : 8;
+    if (s.length % 2 === 1) s = "0" + s;
+    const byteLen = s.length / 2;
     let value = BigInt("0x" + s);
-    const mask = (1n << BigInt(width * 8)) - 1n;
-    value &= mask;
-    for (let i = 0; i < width; i++) {
-      chunks.push(Number((value >> BigInt(8 * i)) & 0xffn));
+    if (endian === "le") {
+      for (let i = 0; i < byteLen; i++) {
+        chunks.push(Number((value >> BigInt(8 * i)) & 0xffn));
+      }
+    } else {
+      for (let i = byteLen - 1; i >= 0; i--) {
+        chunks.push(Number((value >> BigInt(8 * i)) & 0xffn));
+      }
     }
   }
   return Uint8Array.from(chunks);
+}
+
+/**
+ * 将字节缓冲按小端编码为 raw hex 行。
+ * 默认每行 4 字节（即 8 hex digits）。
+ */
+export function bufferToRawHexLines(
+  raw: Uint8Array,
+  bytesPerLine = 4,
+  endian: Endian = "le",
+): Array<{ hex: string }> {
+  if (bytesPerLine <= 0) return [];
+  const out: Array<{ hex: string }> = [];
+  for (let i = 0; i < raw.length; i += bytesPerLine) {
+    const end = Math.min(i + bytesPerLine, raw.length);
+    let value = 0n;
+    if (endian === "le") {
+      for (let j = 0; j < end - i; j++) {
+        value |= BigInt(raw[i + j]) << BigInt(8 * j);
+      }
+    } else {
+      for (let j = 0; j < end - i; j++) {
+        value = (value << 8n) | BigInt(raw[i + j]);
+      }
+    }
+    const width = (end - i) * 2;
+    out.push({ hex: "0x" + value.toString(16).padStart(width, "0") });
+  }
+  return out;
 }
 
 /**
@@ -434,6 +478,7 @@ export function decodeRawByRegistry(
 export function decodePerfRawData(
   perfData: PerfData,
   registry: TraceParserRegistry,
+  options: DecodePerfRawDataOptions = {},
 ): PerfData {
   return {
     recordSamples: perfData.recordSamples.map((sample) => {
@@ -442,16 +487,25 @@ export function decodePerfRawData(
       const raw = rawHexLinesToBuffer(sample.raw.lines);
       const decoded = decodeRawByRegistry(raw, registry);
 
-      const replacement =
+      const base =
         decoded.renderedText ??
         (decoded.commonType !== undefined ? String(decoded.commonType) : "");
-      if (!replacement) return sample;
+      if (!base) return sample;
+
+      const commonLine = options.keepCommonFields
+        ? Object.entries(decoded.commonFields)
+            .map(([k, v]) => `${k}:${typeof v === "bigint" ? v.toString(10) : v}`)
+            .join(" ")
+        : "";
 
       return {
         ...sample,
         raw: {
           ...sample.raw,
-          lines: [{ hex: replacement }],
+          lines:
+            options.keepCommonFields && commonLine.length > 0
+              ? [{ hex: base }, { hex: commonLine }]
+              : [{ hex: base }],
         },
       };
     }),

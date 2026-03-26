@@ -4,6 +4,7 @@ import {
   parseTraceFormat,
   parseCommonFieldsFromRaw,
   rawHexLinesToBuffer,
+  bufferToRawHexLines,
   buildTraceParserRegistry,
   decodeRawByRegistry,
   decodePerfRawData,
@@ -73,6 +74,22 @@ test("rawHexLinesToBuffer should produce bytes for common header", () => {
   const view = new DataView(buf.buffer);
   assert.equal(view.getUint32(0, true), 0x1234);
   assert.equal(view.getUint32(4, true), 0x5678);
+});
+
+test("raw little-endian encode/decode should round-trip", () => {
+  const bytes = new Uint8Array([0x34, 0x12, 0x78, 0x56, 0xef, 0xcd, 0xab, 0x90]);
+  const lines = bufferToRawHexLines(bytes, 4);
+  assert.deepEqual(lines, [{ hex: "0x56781234" }, { hex: "0x90abcdef" }]);
+  const decoded = rawHexLinesToBuffer(lines);
+  assert.deepEqual(Array.from(decoded), Array.from(bytes));
+});
+
+test("raw big-endian encode/decode should round-trip", () => {
+  const bytes = new Uint8Array([0x12, 0x34, 0x56, 0x78, 0x90, 0xab, 0xcd, 0xef]);
+  const lines = bufferToRawHexLines(bytes, 4, "be");
+  assert.deepEqual(lines, [{ hex: "0x12345678" }, { hex: "0x90abcdef" }]);
+  const decoded = rawHexLinesToBuffer(lines, "be");
+  assert.deepEqual(Array.from(decoded), Array.from(bytes));
 });
 
 test("decodeRawByRegistry should parse common and render print fmt", () => {
@@ -150,6 +167,38 @@ test("decodePerfRawData should replace sample.raw with common_type when parser m
   const out = decodePerfRawData(perfData, registry);
   assert.equal(out.recordSamples[0].raw.lines.length, 1);
   assert.equal(out.recordSamples[0].raw.lines[0].hex, "99");
+});
+
+test("decodePerfRawData keepCommonFields option should prefix common_*", () => {
+  const registry = buildTraceParserRegistry([SAMPLE_FORMAT]);
+  const rawBytes = new Uint8Array([
+    0x16, 0x00, 0x01, 0x02, 0x03, 0x00, 0x00, 0x00,
+    0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x22,  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ]);
+  const perfData = {
+    recordSamples: [
+      {
+        raw: {
+          size: rawBytes.length,
+          lines: rawBytesToHexLinesLE4(rawBytes),
+        },
+      },
+    ],
+  };
+  const out = decodePerfRawData(perfData, registry, { keepCommonFields: true });
+  assert.equal(out.recordSamples[0].raw.lines.length, 2);
+  assert.equal(out.recordSamples[0].raw.lines[0].hex, "NR 7 (11, 22)");
+  const common = out.recordSamples[0].raw.lines[1].hex;
+  assert.ok(common.includes("common_type:22"));
+  assert.ok(common.includes("common_flags:1"));
+  assert.ok(common.includes("common_preempt_count:2"));
+  assert.ok(common.includes("common_pid:3"));
 });
 
 test("__data_loc char[] should be decoded and usable in print fmt", () => {

@@ -6,6 +6,7 @@ export {
   parseCommonFieldsFromRaw,
   parseAllFieldsFromRaw,
   rawHexLinesToBuffer,
+  bufferToRawHexLines,
   buildTraceParserRegistry,
   decodeRawByRegistry,
   decodePerfRawData,
@@ -15,6 +16,8 @@ export type {
   TraceFormatField,
   TraceParserRegistry,
   DecodedRawSample,
+  DecodePerfRawDataOptions,
+  Endian,
 } from "./traceFormat.js";
 export type { PerfData, RecordSample } from "./types.js";
 export type { RecordSampleJsonExportItem } from "./serializer.js";
