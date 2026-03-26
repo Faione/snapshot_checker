@@ -369,13 +369,18 @@ function renderPrintFmt(
 ): string {
   const values: Array<number | bigint | string> = [];
 
-  function evalExpr(exprRaw: string): number | bigint | string {
-    // 允许表达式带括号与空格
+  function normalizeExpr(exprRaw: string): string {
     let expr = exprRaw.trim();
     // 去掉外层括号（可能不止一层，也可能只有一侧被 match 捕获到）
     while (expr.startsWith("(")) expr = expr.slice(1).trim();
     while (expr.endsWith(")")) expr = expr.slice(0, -1).trim();
     expr = expr.replace(/\s+/g, "");
+    return expr;
+  }
+
+  function evalExpr(exprRaw: string): number | bigint | string {
+    // 允许表达式带括号与空格
+    const expr = normalizeExpr(exprRaw);
 
     // (REC->__data_loc_reason&0xffff) / (REC->__data_loc_reason>>16)
     let m = expr.match(/^REC->(\w+)&0xffff$/);
@@ -408,13 +413,26 @@ function renderPrintFmt(
     return v ?? 0;
   }
 
+  const normalizedArgs = (printArgs ?? []).map(normalizeExpr);
   for (const expr of printArgs ?? []) {
     values.push(evalExpr(expr));
   }
 
   let valueIdx = 0;
   return printFmt.replace(/%[0-9]*[lh]*([duxXsS])/g, (_all, spec: string) => {
-    const v = values[valueIdx++] ?? 0;
+    const idx = valueIdx++;
+    const v = values[idx] ?? 0;
+    const argExpr = normalizedArgs[idx] ?? "";
+    // %s + REC->__data_loc_xxx 时，优先打印已解析出来的 xxx 字符串
+    if (spec.toLowerCase() === "s") {
+      const m = argExpr.match(/^REC->__data_loc_(\w+)$/);
+      if (m) {
+        const s = fieldMap[m[1]];
+        if (typeof s === "string") {
+          return s;
+        }
+      }
+    }
     return formatArgBySpecifier(v, spec);
   });
 }

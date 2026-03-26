@@ -234,3 +234,34 @@ print fmt: "reason=%s off=%u len=%u", REC->reason, (REC->__data_loc_reason & 0xf
   assert.equal(out.commonType, 77);
   assert.equal(out.renderedText, `reason=hello off=${offset} len=${len}`);
 });
+
+test("%s with REC->__data_loc_reason should print resolved reason string", () => {
+  const format = `name: foo
+ID: 78
+format:
+  field:unsigned short common_type;  offset:0; size:2; signed:0;
+  field:unsigned char common_flags;  offset:2; size:1; signed:0;
+  field:unsigned char common_preempt_count; offset:3; size:1; signed:0;
+  field:int common_pid; offset:4; size:4; signed:1;
+  field:__data_loc char[] reason; offset:8; size:4; signed:0;
+
+print fmt: "reason=%s", REC->__data_loc_reason
+`;
+  const registry = buildTraceParserRegistry([format]);
+
+  const offset = 16;
+  const str = new TextEncoder().encode("hello\0");
+  const len = str.length;
+  const loc = (len << 16) | offset;
+  const rawBytes = new Uint8Array(16 + len);
+  rawBytes[0] = 78; rawBytes[1] = 0; // common_type
+  rawBytes[8] = loc & 0xff;
+  rawBytes[9] = (loc >> 8) & 0xff;
+  rawBytes[10] = (loc >> 16) & 0xff;
+  rawBytes[11] = (loc >> 24) & 0xff;
+  rawBytes.set(str, offset);
+
+  const out = decodeRawByRegistry(rawBytes, registry);
+  assert.equal(out.skipped, false);
+  assert.equal(out.renderedText, "reason=hello");
+});
