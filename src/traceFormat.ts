@@ -425,7 +425,7 @@ function renderPrintFmt(
     const argExpr = normalizedArgs[idx] ?? "";
     // %s + REC->__data_loc_xxx 时，优先打印已解析出来的 xxx 字符串
     if (spec.toLowerCase() === "s") {
-      const m = argExpr.match(/^REC->__data_loc_(\w+)$/);
+      const m = argExpr.match(/^REC->__data_loc_(\w+)(?:&0xffff)?(?:>>16)?$/);
       if (m) {
         const s = fieldMap[m[1]];
         if (typeof s === "string") {
